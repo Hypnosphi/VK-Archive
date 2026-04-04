@@ -1,0 +1,13 @@
+# List the VK users to archive — one per line.
+# You can use either:
+#   - a numeric ID:      123456789
+#   - a screen name:     durov
+#   - a profile URL:     https://vk.com/durov  (the part after vk.com/)
+#
+# Lines starting with # are ignored.
+
+durov
+id123456789
+another_screenname
+fourth_user
+fifth_user

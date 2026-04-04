@@ -1,0 +1,62 @@
+name: Fetch & Deploy VK Archive
+
+on:
+  # Run on a schedule — once a day to keep archive fresh
+  schedule:
+    - cron: "0 3 * * *"   # 03:00 UTC daily
+  # Also allow triggering manually from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: write       # needed to commit posts.json back to repo
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch posts from VK
+        env:
+          VK_TOKEN: ${{ secrets.VK_TOKEN }}
+        run: python fetch_vk.py
+
+      - name: Commit updated posts.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add posts.json
+          git diff --cached --quiet || git commit -m "chore: update posts.json [skip ci]"
+          git push
+
+      - name: Build static site
+        run: python build_site.py
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
