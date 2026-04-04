@@ -169,14 +169,28 @@ def download_videos(posts, manifest):
                     failed += 1
                     continue
                 template = VIDEOS_DIR / f"{key}.%(ext)s"
+                valid_suffixes = (".mp4", ".webm", ".mkv", ".mov")
+                # Remove stale outputs for this key so yt-dlp result detection is unambiguous.
+                stale_matches = [
+                    f for f in VIDEOS_DIR.glob(f"{key}.*")
+                    if f.suffix.lower() in valid_suffixes
+                ]
+                for stale_file in stale_matches:
+                    stale_file.unlink()
                 download_via_ytdlp(player, template)
-                # Locate the file yt-dlp created
+                # Locate the file yt-dlp created deterministically.
                 matches = [
                     f for f in VIDEOS_DIR.glob(f"{key}.*")
-                    if f.suffix.lower() in (".mp4", ".webm", ".mkv", ".mov")
+                    if f.suffix.lower() in valid_suffixes
                 ]
                 if matches:
-                    filename = matches[0].name
+                    mp4_matches = [f for f in matches if f.suffix.lower() == ".mp4"]
+                    selected = (
+                        max(mp4_matches, key=lambda f: f.stat().st_mtime)
+                        if mp4_matches
+                        else max(matches, key=lambda f: f.stat().st_mtime)
+                    )
+                    filename = selected.name
                     manifest["videos"][key] = f"videos/{filename}"
                     done += 1
                 else:
