@@ -19,6 +19,9 @@ from pathlib import Path
 OUT_DIR = Path("_site")
 POSTS_PER_PAGE = 50
 
+# Populated in main() from assets/manifest.json
+ASSET_MANIFEST: dict = {"images": {}, "videos": {}}
+
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -43,12 +46,21 @@ def render_attachment(att):
 
     if kind == "photo":
         photo = att["photo"]
+        owner_id = photo.get("owner_id", 0)
+        photo_id = photo.get("id", 0)
+        key = f"{owner_id}_{photo_id}"
+        local = ASSET_MANIFEST["images"].get(key)
         sizes = sorted(photo.get("sizes", []), key=lambda s: s.get("width", 0), reverse=True)
-        if sizes:
+        if local:
+            src   = f"../assets/{local}"
+            thumb = src
+        elif sizes:
             src   = sizes[0]["url"]
             thumb = next((s["url"] for s in sizes if s.get("width", 0) <= 604), src)
-            return (f'<a href="{escape(src)}" target="_blank" rel="noopener">'
-                    f'<img class="photo" src="{escape(thumb)}" loading="lazy" alt="photo"></a>')
+        else:
+            return ""
+        return (f'<a href="{escape(src)}" target="_blank" rel="noopener">'
+                f'<img class="photo" src="{escape(thumb)}" loading="lazy" alt="photo"></a>')
 
     elif kind == "link":
         link  = att["link"]
@@ -65,14 +77,32 @@ def render_attachment(att):
                 f'{img_html}<span class="link-text"><strong>{title}</strong>{desc_html}</span></a>')
 
     elif kind == "video":
-        vid   = att["video"]
-        title = escape(vid.get("title", "Video"))
-        thumb = next((vid[k] for k in ["photo_800","photo_640","photo_320","photo_130"] if vid.get(k)), "")
-        vk_url = f"https://vk.com/video{vid.get('owner_id')}_{vid.get('id')}"
-        img_tag = f'<img class="video-thumb" src="{escape(thumb)}" alt="">' if thumb else ""
-        return (f'<a class="video-card" href="{escape(vk_url)}" target="_blank" rel="noopener">'
-                f'{img_tag}<span class="play-icon">▶</span>'
-                f'<span class="video-title">{title}</span></a>')
+        vid    = att["video"]
+        owner_id = vid.get("owner_id", 0)
+        video_id = vid.get("id", 0)
+        key    = f"{owner_id}_{video_id}"
+        local  = ASSET_MANIFEST["videos"].get(key)
+        title  = escape(vid.get("title", "Video"))
+        thumb  = next((vid[k] for k in ["photo_800","photo_640","photo_320","photo_130"] if vid.get(k)), "")
+        # Also check the newer 'image' array format
+        if not thumb and vid.get("image"):
+            img_list = sorted(vid["image"], key=lambda s: s.get("width", 0), reverse=True)
+            if img_list:
+                thumb = img_list[0].get("url", "")
+        if local:
+            src = f"../assets/{local}"
+            poster_attr = f' poster="{escape(thumb)}"' if thumb else ""
+            return (f'<video class="local-video" controls preload="none"'
+                    f' aria-label="{title}"{poster_attr}>'
+                    f'<source src="{escape(src)}">'
+                    f'</video>'
+                    f'<span class="video-title">{title}</span>')
+        else:
+            vk_url  = f"https://vk.com/video{owner_id}_{video_id}"
+            img_tag = f'<img class="video-thumb" src="{escape(thumb)}" alt="">' if thumb else ""
+            return (f'<a class="video-card" href="{escape(vk_url)}" target="_blank" rel="noopener">'
+                    f'{img_tag}<span class="play-icon">▶</span>'
+                    f'<span class="video-title">{title}</span></a>')
 
     elif kind == "audio":
         audio = att["audio"]
@@ -199,6 +229,7 @@ main{max-width:680px;margin:0 auto;padding:32px 16px 64px}
            width:56px;height:56px;display:flex;align-items:center;
            justify-content:center;border-radius:50%}
 .video-title{display:block;background:rgba(0,0,0,.7);color:#fff;font-size:.8rem;padding:6px 10px}
+.local-video{display:block;max-width:100%;max-height:400px;border-radius:8px}
 .audio-card,.doc-card{background:var(--bg);border:1px solid var(--border);
                        border-radius:8px;padding:8px 14px;font-size:.88rem}
 .doc-card{display:inline-block}
@@ -328,10 +359,22 @@ def build_index_page(users_meta):
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
+    global ASSET_MANIFEST
+
     posts_file = Path("posts.json")
     if not posts_file.exists():
         print("ERROR: posts.json not found. Run fetch_vk.py first.")
         raise SystemExit(1)
+
+    manifest_file = Path("assets/manifest.json")
+    if manifest_file.exists():
+        with open(manifest_file, encoding="utf-8") as f:
+            ASSET_MANIFEST = json.load(f)
+        n_imgs = len(ASSET_MANIFEST.get("images", {}))
+        n_vids = len(ASSET_MANIFEST.get("videos", {}))
+        print(f"→ Loaded asset manifest ({n_imgs} images, {n_vids} videos)")
+    else:
+        print("→ No asset manifest found; all media will link to VK")
 
     print("→ Loading posts.json...")
     with open(posts_file, encoding="utf-8") as f:
@@ -345,6 +388,12 @@ def main():
     if OUT_DIR.exists():
         shutil.rmtree(OUT_DIR)
     OUT_DIR.mkdir(parents=True)
+
+    # Copy downloaded assets into _site/assets/ so they are served by Pages
+    assets_src = Path("assets")
+    if assets_src.exists():
+        shutil.copytree(assets_src, OUT_DIR / "assets")
+        print("→ Copied assets/ → _site/assets/")
 
     # Group posts by owner
     posts_by_uid = {u["id"]: [] for u in users}

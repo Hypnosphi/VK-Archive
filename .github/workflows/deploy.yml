@@ -41,12 +41,22 @@ jobs:
           VK_TOKEN: ${{ secrets.VK_TOKEN }}
         run: python fetch_vk.py
 
-      - name: Commit updated posts.json
+      - name: Restore assets cache
+        uses: actions/cache@v4
+        with:
+          path: assets
+          key: assets-${{ hashFiles('posts.json') }}
+          restore-keys: assets-
+
+      - name: Download images and videos
+        run: python download_assets.py
+
+      - name: Commit updated posts.json and asset manifest
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add posts.json
-          git diff --cached --quiet || git commit -m "chore: update posts.json [skip ci]"
+          git add posts.json assets/manifest.json
+          git diff --cached --quiet || git commit -m "chore: update posts.json and asset manifest [skip ci]"
           git push
 
       - name: Build static site

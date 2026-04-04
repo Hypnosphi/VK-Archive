@@ -51,6 +51,53 @@ def resolve_users(identifiers):
     return result
 
 
+def enrich_video_attachments(all_posts):
+    """Call video.get in batches to add 'files' and 'player' to every video attachment."""
+    # Collect unique videos preserving a reference to the dict so we can update it in place
+    seen = {}
+    for post in all_posts:
+        sources = [post] + post.get("copy_history", [])
+        for src in sources:
+            for att in src.get("attachments", []):
+                if att.get("type") == "video":
+                    vid = att["video"]
+                    key = (vid.get("owner_id"), vid.get("id"))
+                    if key not in seen:
+                        seen[key] = []
+                    seen[key].append(vid)
+
+    if not seen:
+        return
+
+    entries = list(seen.items())  # [((owner_id, video_id), [vid_dict, ...]), ...]
+    print(f"  Enriching {len(entries)} unique video(s) via video.get...")
+    BATCH = 200
+    for i in range(0, len(entries), BATCH):
+        batch = entries[i : i + BATCH]
+        videos_param = ",".join(
+            f"{key[0]}_{key[1]}" for key, _ in batch
+        )
+        try:
+            resp = vk_api("video.get", videos=videos_param, extended=0)
+            items_by_key = {
+                (item["owner_id"], item["id"]): item
+                for item in resp.get("items", [])
+            }
+            for key, vid_dicts in batch:
+                enriched = items_by_key.get(key)
+                if enriched:
+                    files  = enriched.get("files", {})
+                    player = enriched.get("player", "")
+                    for vd in vid_dicts:
+                        if files:
+                            vd["files"] = files
+                        if player:
+                            vd["player"] = player
+        except Exception as exc:
+            print(f"    Warning: video.get batch failed: {exc}")
+        time.sleep(RATE_LIMIT_DELAY)
+
+
 def fetch_all_posts(owner_id):
     """Paginate through the entire wall for one user."""
     all_posts = []
@@ -147,6 +194,9 @@ def main():
         time.sleep(RATE_LIMIT_DELAY)
 
     output["posts"].sort(key=lambda p: p.get("date", 0), reverse=True)
+
+    print("\n→ Enriching video attachments with direct file URLs...")
+    enrich_video_attachments(output["posts"])
 
     out_path = Path("posts.json")
     with open(out_path, "w", encoding="utf-8") as f:
