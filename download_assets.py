@@ -112,9 +112,9 @@ def download_videos(posts, manifest):
     """Download video attachments; update manifest in place."""
     videos_seen = {}
     for kind, att in collect_attachments(posts):
-        if kind != "video":
+        if kind not in ("video", "short_video"):
             continue
-        vid = att["video"]
+        vid = att[kind]
         owner_id = vid.get("owner_id", 0)
         video_id = vid.get("id", 0)
         key = f"{owner_id}_{video_id}"
