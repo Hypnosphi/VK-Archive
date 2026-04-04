@@ -144,9 +144,12 @@ def download_videos(posts, manifest):
     print(f"→ Found {total} unique video(s)")
 
     for key, vid in videos_seen.items():
-        if key in manifest["videos"]:
-            skip += 1
-            continue
+        manifest_path = manifest["videos"].get(key)
+        if manifest_path:
+            video_path = ASSETS_DIR / manifest_path
+            if video_path.is_file():
+                skip += 1
+                continue
 
         title = vid.get("title", key)
         print(f"  Downloading video: {title} ({key})")
