@@ -147,10 +147,10 @@ def download_videos(posts, manifest):
         title = vid.get("title", key)
         print(f"  Downloading video: {title} ({key})")
 
-        # Prefer a direct VK mp4 URL (native VK videos have a 'files' dict)
+        # Prefer the best available direct VK mp4 URL (native VK videos have a 'files' dict)
         files = vid.get("files", {})
         direct_url = None
-        for quality in ("mp4_480", "mp4_360", "mp4_720", "mp4_240", "mp4_1080"):
+        for quality in ("mp4_1080", "mp4_720", "mp4_480", "mp4_360", "mp4_240"):
             if files.get(quality):
                 direct_url = files[quality]
                 break
