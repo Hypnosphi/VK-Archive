@@ -76,7 +76,7 @@ def render_attachment(att):
         return (f'<a class="link-card" href="{url}" target="_blank" rel="noopener">'
                 f'{img_html}<span class="link-text"><strong>{title}</strong>{desc_html}</span></a>')
 
-    elif kind in ("video", "short_video"):
+    elif kind == "video":
         vid    = att[kind]
         owner_id = vid.get("owner_id", 0)
         video_id = vid.get("id", 0)
