@@ -49,7 +49,7 @@ def render_attachment(att):
         owner_id = photo.get("owner_id", 0)
         photo_id = photo.get("id", 0)
         key = f"{owner_id}_{photo_id}"
-        local = ASSET_MANIFEST["images"].get(key)
+        local = ASSET_MANIFEST.get("images", {}).get(key)
         sizes = sorted(photo.get("sizes", []), key=lambda s: s.get("width", 0), reverse=True)
         if local:
             src   = f"../assets/{local}"
