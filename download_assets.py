@@ -11,7 +11,6 @@ are skipped, so re-runs are fast and incremental.
 """
 
 import json
-import os
 import subprocess
 import sys
 import time
@@ -34,9 +33,11 @@ def load_manifest():
 
 
 def save_manifest(manifest):
-    MANIFEST_FILE.write_text(
+    tmp = MANIFEST_FILE.with_suffix(".tmp")
+    tmp.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+    tmp.replace(MANIFEST_FILE)
 
 
 def download_file(url, dest_path):
@@ -187,6 +188,7 @@ def download_videos(posts, manifest):
 
         # Save after each video so progress survives interruption
         save_manifest(manifest)
+        time.sleep(RATE_LIMIT_DELAY)
 
     print(f"  videos  — downloaded: {done}, skipped: {skip}, failed: {failed}")
 
