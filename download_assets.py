@@ -210,6 +210,7 @@ def main():
     download_images(posts, manifest)
     download_videos(posts, manifest)
 
+    save_manifest(manifest)
     print(f"→ Manifest saved to {MANIFEST_FILE}")
 
 
