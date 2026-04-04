@@ -98,9 +98,13 @@ def render_attachment(att):
                     f'</video>'
                     f'<span class="video-title">{title}</span>')
         else:
-            # Link to the original source if available, otherwise fall back to the VK page
-            player  = vid.get("player", "")
-            link_url = player if player else f"https://vk.com/video{owner_id}_{video_id}"
+            # Link to the original source if available, otherwise fall back to the VK page.
+            # Only allow http(s) URLs to prevent javascript: or other unsafe schemes.
+            player = vid.get("player", "")
+            if player and player.startswith(("http://", "https://")):
+                link_url = player
+            else:
+                link_url = f"https://vk.com/video{owner_id}_{video_id}"
             img_tag = f'<img class="video-thumb" src="{escape(thumb)}" alt="">' if thumb else ""
             return (f'<a class="video-card" href="{escape(link_url)}" target="_blank" rel="noopener">'
                     f'{img_tag}<span class="play-icon">▶</span>'
