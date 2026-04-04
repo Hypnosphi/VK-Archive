@@ -134,6 +134,7 @@ def download_videos(posts, manifest):
             if video_path.is_file():
                 skip += 1
                 continue
+            del manifest["videos"][key]
 
         # Prefer the best available direct VK mp4 URL (native VK videos have a 'files' dict)
         files = vid.get("files", {})
