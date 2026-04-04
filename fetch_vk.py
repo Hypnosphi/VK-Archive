@@ -59,8 +59,9 @@ def enrich_video_attachments(all_posts):
         sources = [post] + post.get("copy_history", [])
         for src in sources:
             for att in src.get("attachments", []):
-                if att.get("type") == "video":
-                    vid = att["video"]
+                kind = att.get("type")
+                if kind in ("video", "short_video"):
+                    vid = att[kind]
                     key = (vid.get("owner_id"), vid.get("id"))
                     if key not in seen:
                         seen[key] = []

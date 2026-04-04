@@ -76,8 +76,8 @@ def render_attachment(att):
         return (f'<a class="link-card" href="{url}" target="_blank" rel="noopener">'
                 f'{img_html}<span class="link-text"><strong>{title}</strong>{desc_html}</span></a>')
 
-    elif kind == "video":
-        vid    = att["video"]
+    elif kind in ("video", "short_video"):
+        vid    = att[kind]
         owner_id = vid.get("owner_id", 0)
         video_id = vid.get("id", 0)
         key    = f"{owner_id}_{video_id}"
@@ -98,9 +98,15 @@ def render_attachment(att):
                     f'</video>'
                     f'<span class="video-title">{title}</span>')
         else:
-            vk_url  = f"https://vk.com/video{owner_id}_{video_id}"
+            # Link to the original source if available, otherwise fall back to the VK page.
+            # Only allow http(s) URLs to prevent javascript: or other unsafe schemes.
+            player = vid.get("player", "")
+            if player and player.startswith(("http://", "https://")):
+                link_url = player
+            else:
+                link_url = f"https://vk.com/video{owner_id}_{video_id}"
             img_tag = f'<img class="video-thumb" src="{escape(thumb)}" alt="">' if thumb else ""
-            return (f'<a class="video-card" href="{escape(vk_url)}" target="_blank" rel="noopener">'
+            return (f'<a class="video-card" href="{escape(link_url)}" target="_blank" rel="noopener">'
                     f'{img_tag}<span class="play-icon">▶</span>'
                     f'<span class="video-title">{title}</span></a>')
 

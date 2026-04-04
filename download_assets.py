@@ -11,7 +11,6 @@ are skipped, so re-runs are fast and incremental.
 """
 
 import json
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -47,21 +46,6 @@ def download_file(url, dest_path):
     with open(dest_path, "wb") as fh:
         for chunk in resp.iter_content(chunk_size=65536):
             fh.write(chunk)
-
-
-def download_via_ytdlp(url, output_template):
-    """Download a video via yt-dlp.  output_template may use %(ext)s."""
-    cmd = [
-        "yt-dlp",
-        "--no-playlist",
-        "--no-warnings",
-        "-f", "bestvideo[height<=480]+bestaudio/best[height<=480]/best",
-        "-o", str(output_template),
-        url,
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or "yt-dlp exited with non-zero status")
 
 
 def collect_attachments(posts):
@@ -128,9 +112,9 @@ def download_videos(posts, manifest):
     """Download video attachments; update manifest in place."""
     videos_seen = {}
     for kind, att in collect_attachments(posts):
-        if kind != "video":
+        if kind not in ("video", "short_video"):
             continue
-        vid = att["video"]
+        vid = att[kind]
         owner_id = vid.get("owner_id", 0)
         video_id = vid.get("id", 0)
         key = f"{owner_id}_{video_id}"
@@ -150,9 +134,7 @@ def download_videos(posts, manifest):
             if video_path.is_file():
                 skip += 1
                 continue
-
-        title = vid.get("title", key)
-        print(f"  Downloading video: {title} ({key})")
+            del manifest["videos"][key]
 
         # Prefer the best available direct VK mp4 URL (native VK videos have a 'files' dict)
         files = vid.get("files", {})
@@ -162,47 +144,18 @@ def download_videos(posts, manifest):
                 direct_url = files[quality]
                 break
 
+        if not direct_url:
+            skip += 1
+            continue
+
+        title = vid.get("title", key)
+        print(f"  Downloading video: {title} ({key})")
+
         try:
-            if direct_url:
-                dest = VIDEOS_DIR / f"{key}.mp4"
-                download_file(direct_url, dest)
-                manifest["videos"][key] = f"videos/{key}.mp4"
-                done += 1
-            else:
-                # Fall back to yt-dlp for external videos (YouTube, etc.)
-                player = vid.get("player", "")
-                if not player:
-                    print(f"  Skipping {key}: no downloadable URL")
-                    failed += 1
-                    continue
-                template = VIDEOS_DIR / f"{key}.%(ext)s"
-                valid_suffixes = (".mp4", ".webm", ".mkv", ".mov")
-                # Remove stale outputs for this key so yt-dlp result detection is unambiguous.
-                stale_matches = [
-                    f for f in VIDEOS_DIR.glob(f"{key}.*")
-                    if f.suffix.lower() in valid_suffixes
-                ]
-                for stale_file in stale_matches:
-                    stale_file.unlink()
-                download_via_ytdlp(player, template)
-                # Locate the file yt-dlp created deterministically.
-                matches = [
-                    f for f in VIDEOS_DIR.glob(f"{key}.*")
-                    if f.suffix.lower() in valid_suffixes
-                ]
-                if matches:
-                    mp4_matches = [f for f in matches if f.suffix.lower() == ".mp4"]
-                    selected = (
-                        max(mp4_matches, key=lambda f: f.stat().st_mtime)
-                        if mp4_matches
-                        else max(matches, key=lambda f: f.stat().st_mtime)
-                    )
-                    filename = selected.name
-                    manifest["videos"][key] = f"videos/{filename}"
-                    done += 1
-                else:
-                    print(f"  Warning: yt-dlp finished but output not found for {key}")
-                    failed += 1
+            dest = VIDEOS_DIR / f"{key}.mp4"
+            download_file(direct_url, dest)
+            manifest["videos"][key] = f"videos/{key}.mp4"
+            done += 1
         except Exception as exc:
             print(f"  Error downloading video {key}: {exc}")
             failed += 1
