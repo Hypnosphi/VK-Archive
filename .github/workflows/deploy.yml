@@ -45,8 +45,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: assets
-          key: assets-${{ hashFiles('posts.json') }}
-          restore-keys: assets-
+          key: assets-${{ runner.os }}-${{ github.ref_name }}
+          restore-keys: |
+            assets-${{ runner.os }}-
+            assets-
 
       - name: Download images and videos
         run: python download_assets.py
