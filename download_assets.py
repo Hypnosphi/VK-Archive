@@ -93,9 +93,13 @@ def download_images(posts, manifest):
     print(f"→ Found {total} unique photo(s)")
 
     for key, photo in photos_seen.items():
-        if key in manifest["images"]:
-            skip += 1
-            continue
+        manifest_path = manifest["images"].get(key)
+        if manifest_path:
+            existing_file = ASSETS_DIR / manifest_path
+            if existing_file.exists():
+                skip += 1
+                continue
+            manifest["images"].pop(key, None)
 
         sizes = sorted(
             photo.get("sizes", []), key=lambda s: s.get("width", 0), reverse=True
