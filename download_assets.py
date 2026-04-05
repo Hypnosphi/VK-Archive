@@ -150,6 +150,13 @@ def download_videos(posts, manifest):
     print(f"→ Found {total} unique video(s)")
 
     for key, vid in videos_seen.items():
+        # Skip videos hosted on external platforms (YouTube, Vimeo, etc.)
+        if vid.get("platform"):
+            # Remove any stale manifest entry for external-platform videos
+            manifest["videos"].pop(key, None)
+            skip += 1
+            continue
+
         manifest_path = manifest["videos"].get(key)
         if manifest_path:
             video_path = ASSETS_DIR / manifest_path
@@ -157,11 +164,6 @@ def download_videos(posts, manifest):
                 skip += 1
                 continue
             del manifest["videos"][key]
-
-        # Skip videos hosted on external platforms (YouTube, Vimeo, etc.)
-        if vid.get("platform"):
-            skip += 1
-            continue
 
         # Prefer the best available direct VK mp4 URL (native VK videos have a 'files' dict)
         files = vid.get("files", {})
