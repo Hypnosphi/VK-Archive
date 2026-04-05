@@ -88,15 +88,14 @@ def render_attachment(att):
             img_list = sorted(vid["image"], key=lambda s: s.get("width", 0), reverse=True)
             if img_list:
                 thumb = img_list[0].get("url", "")
-        # Prefer a release download URL, then a local asset, then a VK link
+        # Use the GitHub Releases URL when available; otherwise fall back to the VK link.
+        # Do NOT use the local assets/videos/ path — those files are not copied into _site/.
         video_url = ASSET_MANIFEST.get("video_urls", {}).get(key)
-        local     = ASSET_MANIFEST["videos"].get(key)
-        if video_url or local:
-            src = video_url or f"../assets/{local}"
+        if video_url:
             poster_attr = f' poster="{escape(thumb)}"' if thumb else ""
             return (f'<video class="local-video" controls preload="none"'
                     f' aria-label="{title}"{poster_attr}>'
-                    f'<source src="{escape(src)}">'
+                    f'<source src="{escape(video_url)}">'
                     f'</video>'
                     f'<span class="video-title">{title}</span>')
         else:
