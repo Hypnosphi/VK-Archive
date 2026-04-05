@@ -155,6 +155,9 @@ def download_videos(posts, manifest):
             # Remove any stale manifest entry for external-platform videos
             manifest["videos"].pop(key, None)
             skip += 1
+            # Save after each video so progress survives interruption
+            save_manifest(manifest)
+            time.sleep(RATE_LIMIT_DELAY)
             continue
 
         manifest_path = manifest["videos"].get(key)
