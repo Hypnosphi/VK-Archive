@@ -81,7 +81,6 @@ def render_attachment(att):
         owner_id = vid.get("owner_id", 0)
         video_id = vid.get("id", 0)
         key    = f"{owner_id}_{video_id}"
-        local  = ASSET_MANIFEST["videos"].get(key)
         title  = escape(vid.get("title", "Video"))
         thumb  = next((vid[k] for k in ["photo_800","photo_640","photo_320","photo_130"] if vid.get(k)), "")
         # Also check the newer 'image' array format
@@ -89,8 +88,11 @@ def render_attachment(att):
             img_list = sorted(vid["image"], key=lambda s: s.get("width", 0), reverse=True)
             if img_list:
                 thumb = img_list[0].get("url", "")
-        if local:
-            src = f"../assets/{local}"
+        # Prefer a release download URL, then a local asset, then a VK link
+        video_url = ASSET_MANIFEST.get("video_urls", {}).get(key)
+        local     = ASSET_MANIFEST["videos"].get(key)
+        if video_url or local:
+            src = video_url or f"../assets/{local}"
             poster_attr = f' poster="{escape(thumb)}"' if thumb else ""
             return (f'<video class="local-video" controls preload="none"'
                     f' aria-label="{title}"{poster_attr}>'
@@ -395,11 +397,13 @@ def main():
         shutil.rmtree(OUT_DIR)
     OUT_DIR.mkdir(parents=True)
 
-    # Copy downloaded assets into _site/assets/ so they are served by Pages
-    assets_src = Path("assets")
-    if assets_src.exists():
-        shutil.copytree(assets_src, OUT_DIR / "assets")
-        print("→ Copied assets/ → _site/assets/")
+    # Copy only images into _site/assets/images/ — videos are served from
+    # GitHub Releases and must not be included in the Pages artifact.
+    images_src = Path("assets") / "images"
+    if images_src.exists():
+        dest_images = OUT_DIR / "assets" / "images"
+        shutil.copytree(images_src, dest_images)
+        print(f"→ Copied assets/images/ → _site/assets/images/")
 
     # Group posts by owner
     posts_by_uid = {u["id"]: [] for u in users}
