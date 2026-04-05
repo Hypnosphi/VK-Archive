@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 
 import requests
+import yt_dlp
 
 ASSETS_DIR   = Path("assets")
 IMAGES_DIR   = ASSETS_DIR / "images"
@@ -46,6 +47,20 @@ def download_file(url, dest_path):
     with open(dest_path, "wb") as fh:
         for chunk in resp.iter_content(chunk_size=65536):
             fh.write(chunk)
+
+
+def download_via_ytdlp(url, dest_path):
+    """Download a video using yt-dlp (handles VK player pages and clips)."""
+    ydl_opts = {
+        "outtmpl": str(dest_path),
+        "quiet": True,
+        "no_warnings": True,
+        "retries": 3,
+        "format": "best[ext=mp4]/best",
+        "merge_output_format": "mp4",
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
 
 
 def collect_attachments(posts):
@@ -144,7 +159,9 @@ def download_videos(posts, manifest):
                 direct_url = files[quality]
                 break
 
-        if not direct_url:
+        # Fall back to yt-dlp via the player/clip URL when no direct mp4 is available
+        player_url = vid.get("player", "")
+        if not direct_url and not player_url:
             skip += 1
             continue
 
@@ -153,7 +170,12 @@ def download_videos(posts, manifest):
 
         try:
             dest = VIDEOS_DIR / f"{key}.mp4"
-            download_file(direct_url, dest)
+            if direct_url:
+                download_file(direct_url, dest)
+            else:
+                download_via_ytdlp(player_url, dest)
+                if not dest.is_file():
+                    raise FileNotFoundError(f"yt-dlp did not produce {dest}")
             manifest["videos"][key] = f"videos/{key}.mp4"
             done += 1
         except Exception as exc:

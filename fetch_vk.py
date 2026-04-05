@@ -98,6 +98,19 @@ def enrich_video_attachments(all_posts):
             print(f"    Warning: video.get batch failed: {exc}")
         time.sleep(RATE_LIMIT_DELAY)
 
+    # For videos still missing a player URL after enrichment, set a fallback VK page URL
+    # so yt-dlp can attempt to download them.  This is especially important for
+    # short_video (clips), where video.get typically returns no files/player.
+    for _key, vid_dicts in entries:
+        for vd in vid_dicts:
+            if not vd.get("files") and not vd.get("player"):
+                owner_id = vd.get("owner_id", 0)
+                video_id = vd.get("id", 0)
+                if vd.get("type") == "short_video":
+                    vd["player"] = f"https://vk.com/clip{owner_id}_{video_id}"
+                else:
+                    vd["player"] = f"https://vk.com/video{owner_id}_{video_id}"
+
 
 def fetch_all_posts(owner_id):
     """Paginate through the entire wall for one user."""
