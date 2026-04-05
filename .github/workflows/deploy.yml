@@ -44,7 +44,9 @@ jobs:
       - name: Restore assets cache
         uses: actions/cache@v4
         with:
-          path: assets
+          path: |
+            assets/images
+            assets/manifest.json
           key: assets-${{ runner.os }}-${{ github.ref_name }}
           restore-keys: |
             assets-${{ runner.os }}-
@@ -52,6 +54,11 @@ jobs:
 
       - name: Download images and videos
         run: python download_assets.py
+
+      - name: Upload videos to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python upload_videos.py
 
       - name: Commit updated posts.json and asset manifest
         run: |

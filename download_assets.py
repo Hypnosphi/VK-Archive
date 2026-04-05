@@ -160,6 +160,11 @@ def download_videos(posts, manifest):
             time.sleep(RATE_LIMIT_DELAY)
             continue
 
+        # If the video is already uploaded to GitHub Releases, skip downloading it.
+        if manifest.get("video_urls", {}).get(key):
+            skip += 1
+            continue
+
         manifest_path = manifest["videos"].get(key)
         if manifest_path:
             video_path = ASSETS_DIR / manifest_path

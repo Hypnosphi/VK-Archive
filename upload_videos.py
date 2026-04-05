@@ -1,0 +1,139 @@
+"""
+upload_videos.py — Upload downloaded videos to a GitHub Release so they can be
+served directly without bloating the GitHub Pages artifact.
+
+For each video in assets/videos/ that is recorded in the manifest, this script:
+  1. Ensures a GitHub Release with the tag `v-assets` exists (creates it if not).
+  2. Uploads any new video files as release assets.
+  3. Stores the resulting download URLs in manifest["video_urls"] so that
+     build_site.py can use them as <video src="..."> instead of a local path.
+
+Requires the `gh` CLI to be authenticated (GH_TOKEN env var is sufficient on
+GitHub Actions).
+"""
+
+import json
+import os
+import subprocess
+from pathlib import Path
+
+RELEASE_TAG   = "v-assets"
+ASSETS_DIR    = Path("assets")
+MANIFEST_FILE = ASSETS_DIR / "manifest.json"
+
+
+def _run(cmd, check=True, capture=True):
+    """Run *cmd*.  When *capture* is False stdout/stderr stream to the console
+    (useful for long-running commands such as ``gh release upload`` so that
+    progress is visible and GitHub Actions' log-inactivity timeout is not hit).
+    """
+    result = subprocess.run(
+        cmd,
+        capture_output=capture,
+        text=capture,
+    )
+    if check and result.returncode != 0:
+        stderr = result.stderr if capture else ""
+        raise RuntimeError(
+            f"Command failed: {' '.join(str(c) for c in cmd)}\n{stderr}"
+        )
+    return result
+
+
+def repo():
+    repository = os.environ.get("GITHUB_REPOSITORY")
+    if not repository:
+        raise RuntimeError(
+            "GITHUB_REPOSITORY is not set. This script expects the GitHub "
+            "repository in 'owner/name' format (normally provided "
+            "automatically by GitHub Actions)."
+        )
+    return repository
+
+
+def ensure_release():
+    result = _run(["gh", "release", "view", RELEASE_TAG, "--repo", repo()], check=False)
+    if result.returncode != 0:
+        print(f"  Creating release {RELEASE_TAG}...")
+        _run([
+            "gh", "release", "create", RELEASE_TAG,
+            "--repo",     repo(),
+            "--title",    "Video Assets",
+            "--notes",    "Auto-managed release for VK Archive video assets.",
+            "--prerelease",
+        ])
+        print(f"  Release {RELEASE_TAG} created.")
+    else:
+        print(f"  Release {RELEASE_TAG} already exists.")
+
+
+def get_existing_asset_names():
+    out = _run([
+        "gh", "release", "view", RELEASE_TAG, "--repo", repo(),
+        "--json", "assets", "--jq", ".assets[].name",
+    ])
+    return set(filter(None, out.stdout.strip().splitlines()))
+
+
+def upload_file(path):
+    _run(
+        ["gh", "release", "upload", RELEASE_TAG, str(path), "--repo", repo()],
+        capture=False,
+    )
+
+
+def main():
+    if not MANIFEST_FILE.exists():
+        print("No manifest.json found — nothing to upload.")
+        return
+
+    manifest   = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+    video_keys = manifest.get("videos", {})
+
+    if not video_keys:
+        print("No videos in manifest — nothing to upload.")
+        return
+
+    ensure_release()
+    existing = get_existing_asset_names()
+
+    base_url = f"https://github.com/{repo()}/releases/download/{RELEASE_TAG}"
+    existing_video_urls = manifest.get("video_urls", {})
+    video_urls = {
+        key: url for key, url in existing_video_urls.items() if key in video_keys
+    }
+
+    new_uploads = 0
+    for key, local_path in video_keys.items():
+        video_file = ASSETS_DIR / local_path
+        filename = Path(local_path).name
+
+        if filename not in existing:
+            if not video_file.is_file():
+                continue
+            print(f"  Uploading {filename} ...")
+            try:
+                upload_file(video_file)
+                existing.add(filename)
+                new_uploads += 1
+            except Exception as exc:
+                print(f"  Error uploading {key}: {exc}")
+                continue
+
+        # Record URL (covers both newly-uploaded and already-present assets)
+        video_urls[key] = f"{base_url}/{filename}"
+
+    manifest["video_urls"] = video_urls
+
+    tmp = MANIFEST_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(MANIFEST_FILE)
+
+    print(
+        f"→ Uploaded {new_uploads} new video(s); "
+        f"{len(video_urls)} total URL(s) in manifest."
+    )
+
+
+if __name__ == "__main__":
+    main()
