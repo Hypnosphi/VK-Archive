@@ -19,7 +19,6 @@ from pathlib import Path
 
 RELEASE_TAG   = "v-assets"
 ASSETS_DIR    = Path("assets")
-VIDEOS_DIR    = ASSETS_DIR / "videos"
 MANIFEST_FILE = ASSETS_DIR / "manifest.json"
 
 
