@@ -56,7 +56,7 @@ def download_via_ytdlp(url, dest_path):
         "quiet": True,
         "no_warnings": True,
         "retries": 3,
-        "format": "best[ext=mp4]/best",
+        "format": "best[ext=mp4]",
         "merge_output_format": "mp4",
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
