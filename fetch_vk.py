@@ -104,8 +104,10 @@ def enrich_video_attachments(all_posts):
     for _key, vid_dicts in entries:
         for vd in vid_dicts:
             if not vd.get("files") and not vd.get("player") and not vd.get("platform"):
-                owner_id = vd.get("owner_id", 0)
-                video_id = vd.get("id", 0)
+                owner_id = vd.get("owner_id")
+                video_id = vd.get("id")
+                if not owner_id or not video_id:
+                    continue
                 if vd.get("type") == "short_video":
                     vd["player"] = f"https://vk.com/clip{owner_id}_{video_id}"
                 else:

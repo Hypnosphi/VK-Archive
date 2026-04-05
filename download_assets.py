@@ -51,6 +51,11 @@ def download_file(url, dest_path):
 
 def download_via_ytdlp(url, dest_path):
     """Download a video using yt-dlp (handles VK player pages and clips)."""
+    # Remove any stale/partial file so we don't mistake it for a successful download
+    dest = Path(dest_path)
+    if dest.exists():
+        dest.unlink()
+
     ydl_opts = {
         "outtmpl": str(dest_path),
         "quiet": True,
@@ -60,7 +65,9 @@ def download_via_ytdlp(url, dest_path):
         "merge_output_format": "mp4",
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+        rc = ydl.download([url])
+        if rc != 0:
+            raise RuntimeError(f"yt-dlp exited with code {rc} for {url}")
 
 
 def collect_attachments(posts):
