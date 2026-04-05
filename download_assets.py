@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 
 import requests
+import yt_dlp
 
 ASSETS_DIR   = Path("assets")
 IMAGES_DIR   = ASSETS_DIR / "images"
@@ -46,6 +47,27 @@ def download_file(url, dest_path):
     with open(dest_path, "wb") as fh:
         for chunk in resp.iter_content(chunk_size=65536):
             fh.write(chunk)
+
+
+def download_via_ytdlp(url, dest_path):
+    """Download a video using yt-dlp (handles VK player pages and clips)."""
+    # Remove any stale/partial file so we don't mistake it for a successful download
+    dest = Path(dest_path)
+    if dest.exists():
+        dest.unlink()
+
+    ydl_opts = {
+        "outtmpl": str(dest_path),
+        "quiet": True,
+        "no_warnings": True,
+        "retries": 3,
+        "format": "best[ext=mp4]",
+        "merge_output_format": "mp4",
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        rc = ydl.download([url])
+        if rc != 0:
+            raise RuntimeError(f"yt-dlp exited with code {rc} for {url}")
 
 
 def collect_attachments(posts):
@@ -128,6 +150,16 @@ def download_videos(posts, manifest):
     print(f"→ Found {total} unique video(s)")
 
     for key, vid in videos_seen.items():
+        # Skip videos hosted on external platforms (YouTube, Vimeo, etc.)
+        if vid.get("platform"):
+            # Remove any stale manifest entry for external-platform videos
+            manifest["videos"].pop(key, None)
+            skip += 1
+            # Save after each video so progress survives interruption
+            save_manifest(manifest)
+            time.sleep(RATE_LIMIT_DELAY)
+            continue
+
         manifest_path = manifest["videos"].get(key)
         if manifest_path:
             video_path = ASSETS_DIR / manifest_path
@@ -144,7 +176,9 @@ def download_videos(posts, manifest):
                 direct_url = files[quality]
                 break
 
-        if not direct_url:
+        # Fall back to yt-dlp via the player/clip URL when no direct mp4 is available
+        player_url = vid.get("player", "")
+        if not direct_url and not player_url:
             skip += 1
             continue
 
@@ -153,7 +187,12 @@ def download_videos(posts, manifest):
 
         try:
             dest = VIDEOS_DIR / f"{key}.mp4"
-            download_file(direct_url, dest)
+            if direct_url:
+                download_file(direct_url, dest)
+            else:
+                download_via_ytdlp(player_url, dest)
+                if not dest.is_file():
+                    raise FileNotFoundError(f"yt-dlp did not produce {dest}")
             manifest["videos"][key] = f"videos/{key}.mp4"
             done += 1
         except Exception as exc:
