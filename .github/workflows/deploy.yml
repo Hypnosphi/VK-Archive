@@ -46,7 +46,6 @@ jobs:
         with:
           path: |
             assets/images
-            assets/videos
             assets/manifest.json
           key: assets-${{ runner.os }}-${{ github.ref_name }}
           restore-keys: |
