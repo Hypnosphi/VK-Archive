@@ -22,11 +22,20 @@ ASSETS_DIR    = Path("assets")
 MANIFEST_FILE = ASSETS_DIR / "manifest.json"
 
 
-def _run(cmd, check=True):
-    result = subprocess.run(cmd, capture_output=True, text=True)
+def _run(cmd, check=True, capture=True):
+    """Run *cmd*.  When *capture* is False stdout/stderr stream to the console
+    (useful for long-running commands such as ``gh release upload`` so that
+    progress is visible and GitHub Actions' log-inactivity timeout is not hit).
+    """
+    result = subprocess.run(
+        cmd,
+        capture_output=capture,
+        text=capture,
+    )
     if check and result.returncode != 0:
+        stderr = result.stderr if capture else ""
         raise RuntimeError(
-            f"Command failed: {' '.join(str(c) for c in cmd)}\n{result.stderr}"
+            f"Command failed: {' '.join(str(c) for c in cmd)}\n{stderr}"
         )
     return result
 
@@ -67,7 +76,10 @@ def get_existing_asset_names():
 
 
 def upload_file(path):
-    _run(["gh", "release", "upload", RELEASE_TAG, str(path), "--repo", repo()])
+    _run(
+        ["gh", "release", "upload", RELEASE_TAG, str(path), "--repo", repo()],
+        capture=False,
+    )
 
 
 def main():
