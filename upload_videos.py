@@ -106,12 +106,11 @@ def main():
     new_uploads = 0
     for key, local_path in video_keys.items():
         video_file = ASSETS_DIR / local_path
-        if not video_file.is_file():
-            continue
-
-        filename = video_file.name
+        filename = Path(local_path).name
 
         if filename not in existing:
+            if not video_file.is_file():
+                continue
             print(f"  Uploading {filename} ...")
             try:
                 upload_file(video_file)
