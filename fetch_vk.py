@@ -103,7 +103,7 @@ def enrich_video_attachments(all_posts):
     # short_video (clips), where video.get typically returns no files/player.
     for _key, vid_dicts in entries:
         for vd in vid_dicts:
-            if not vd.get("files") and not vd.get("player"):
+            if not vd.get("files") and not vd.get("player") and not vd.get("platform"):
                 owner_id = vd.get("owner_id", 0)
                 video_id = vd.get("id", 0)
                 if vd.get("type") == "short_video":

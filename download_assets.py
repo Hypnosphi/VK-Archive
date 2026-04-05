@@ -151,6 +151,11 @@ def download_videos(posts, manifest):
                 continue
             del manifest["videos"][key]
 
+        # Skip videos hosted on external platforms (YouTube, Vimeo, etc.)
+        if vid.get("platform"):
+            skip += 1
+            continue
+
         # Prefer the best available direct VK mp4 URL (native VK videos have a 'files' dict)
         files = vid.get("files", {})
         direct_url = None
