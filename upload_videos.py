@@ -85,8 +85,11 @@ def main():
     ensure_release()
     existing = get_existing_asset_names()
 
-    base_url   = f"https://github.com/{repo()}/releases/download/{RELEASE_TAG}"
-    video_urls = manifest.get("video_urls", {})
+    base_url = f"https://github.com/{repo()}/releases/download/{RELEASE_TAG}"
+    existing_video_urls = manifest.get("video_urls", {})
+    video_urls = {
+        key: url for key, url in existing_video_urls.items() if key in video_keys
+    }
 
     new_uploads = 0
     for key, local_path in video_keys.items():
