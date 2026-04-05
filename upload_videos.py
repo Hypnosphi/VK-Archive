@@ -32,7 +32,14 @@ def _run(cmd, check=True):
 
 
 def repo():
-    return os.environ["GITHUB_REPOSITORY"]
+    repository = os.environ.get("GITHUB_REPOSITORY")
+    if not repository:
+        raise RuntimeError(
+            "GITHUB_REPOSITORY is not set. This script expects the GitHub "
+            "repository in 'owner/name' format (normally provided "
+            "automatically by GitHub Actions)."
+        )
+    return repository
 
 
 def ensure_release():
